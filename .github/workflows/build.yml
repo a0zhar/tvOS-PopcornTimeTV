@@ -19,22 +19,28 @@ jobs:
       with:
         submodules: true
 
-    - name: Install Bundler and CocoaPods
-      run: |
-        gem install bundler
-        gem install cocoapods -v 1.8.3
-        pod --version  # Verify CocoaPods version
-
-    - name: Install Ruby Gems and CocoaPods Dependencies
-      run: |
-        bundle install
-        bundle exec pod repo update
-        bundle exec pod install
+    - name: use cache
+      id: cache
+      uses: actions/cache@v2
+      with:
+        path: Frameworks
+        key: ${{ runner.os }}-${{ hashFiles('Podfile') }}-${{ hashFiles('Gemfile') }}
 
     - name: Update Podfile to use specific Reachability commit
       run: |
-        sed -i '' -e "s|commit `788111ebf98e86368cd03da17f884015d2fc1543`|tag 'v3.2'|g" Podfile
+        sed -i '' -e "s|commit 788111ebf98e86368cd03da17f884015d2fc1543|tag 'v3.2'|g" Podfile
         cat Podfile
+
+    - name: Retry Get Dependencies
+      run: |
+        for i in 1 2 3; do
+          if bundle exec pod install; then
+            break
+          else
+            echo "Retrying pod install ($i/3)..."
+            sleep 5
+          fi
+        done
 
     - name: Clean Build Artifacts
       run: |
